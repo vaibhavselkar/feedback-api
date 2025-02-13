@@ -14,7 +14,7 @@ nltk.download('punkt')
 nltk.download('wordnet')
 
 # Load CEFR word list
-cefr_vocab = pd.read_csv('./cefr-vocab-cefrj-octanove.csv')
+cefr_vocab = pd.read_csv('app/cefr-vocab.csv')
 cefr_dict = dict(zip(cefr_vocab["headword"], cefr_vocab["CEFR"]))
 
 # Initialize utilities
