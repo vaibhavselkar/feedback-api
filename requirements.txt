@@ -1,9 +1,5 @@
 fastapi
 uvicorn
-pyspellchecker
 nltk
-spacy
 pandas
-torch
-git+https://github.com/PrithivirajDamodaran/Gramformer.git
-tabulate
+pyspellchecker
