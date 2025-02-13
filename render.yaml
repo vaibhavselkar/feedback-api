@@ -1,8 +1,5 @@
-services:
-  - type: web
-    name: feedback-api
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn app.index:app --host 0.0.0.0 --port 10000"
-    plan: free
-    autoDeploy: true
+pre-build:
+  - python -m spacy download en_core_web_sm
+  - pip install -U git+https://github.com/PrithivirajDamodaran/Gramformer.git
+start:
+  - uvicorn app.index:app --host 0.0.0.0 --port 8000
