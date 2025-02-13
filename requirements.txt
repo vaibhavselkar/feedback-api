@@ -5,6 +5,6 @@ nltk
 spacy
 pandas
 torch
-Gramformer
+git+https://github.com/PrithivirajDamodaran/Gramformer.git
 spellchecker
 tabulate
