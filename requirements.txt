@@ -6,5 +6,4 @@ spacy
 pandas
 torch
 git+https://github.com/PrithivirajDamodaran/Gramformer.git
-spellchecker
 tabulate
