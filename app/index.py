@@ -9,6 +9,11 @@ import spacy
 import torch
 from gramformer import Gramformer
 from collections import defaultdict
+import os
+import sys
+
+# Ensure the app directory is in the Python path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -18,10 +23,16 @@ nltk.download('punkt')
 nltk.download('wordnet')
 
 # Load spaCy model
-nlp = spacy.load("en_core_web_sm")
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    import subprocess
+    subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
+    nlp = spacy.load("en_core_web_sm")
 
 # Load CEFR vocabulary
-cefr_vocab = pd.read_csv("data/cefr-vocab-cefrj-octanove.csv")
+csv_path = os.path.join(os.path.dirname(__file__), "cefr-vocab-cefr-octanove.csv")
+cefr_vocab = pd.read_csv(csv_path)
 cefr_dict = {k: v for k, v in cefr_vocab[['headword', 'CEFR']].values}
 word_set = set(cefr_vocab.headword)
 
@@ -66,7 +77,7 @@ def text_grammar_correction(input_text):
 # Spell check function
 def sentence_spelling_correction(input_text):
     words = word_tokenize(input_text.lower())
-    corrected_words = [spell.correction(word) if word in spell.unknown([word]) else word for word in words]
+    corrected_words = [spell.correction(word) if spell.unknown([word]) else word for word in words]
     return " ".join(corrected_words) + "."
 
 # API endpoint for text analysis
