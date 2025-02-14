@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 import pandas as pd
 import re
 import nltk
@@ -26,6 +27,10 @@ cefr_dict = dict(zip(cefr_vocab["headword"].str.lower(), cefr_vocab["CEFR"]))
 # Initialize utilities
 lemmatizer = WordNetLemmatizer()
 spell = SpellChecker()
+
+# Pydantic model for request body
+class TextInput(BaseModel):
+    text: str
 
 # Function to analyze CEFR level of words
 def cefr_analysis(text):
