@@ -22,6 +22,11 @@ if not os.path.exists(CEFR_FILE):
 
 # Load CEFR word list
 cefr_vocab = pd.read_csv(CEFR_FILE)
+
+# Fix column names in case of extra spaces
+cefr_vocab.columns = cefr_vocab.columns.str.strip()
+
+# Convert CSV to dictionary
 cefr_dict = dict(zip(cefr_vocab["headword"].str.lower(), cefr_vocab["CEFR"]))
 
 # Initialize utilities
@@ -49,7 +54,10 @@ def cefr_analysis(text):
 # Function for simple spell correction
 def correct_spelling(text):
     words = word_tokenize(text.lower())
-    corrected_words = [spell.correction(word) if word in spell.unknown([word]) else word for word in words]
+    corrected_words = [
+        spell.correction(word) if spell.correction(word) else word
+        for word in words
+    ]
     return " ".join(corrected_words)
 
 # Function to calculate an overall CEFR level
@@ -78,9 +86,11 @@ def determine_cefr_level(cefr_count):
         return "C2"
 
 # API Endpoint
-@app.post("/feedback")
-async def analyze_text(text: str):
-    if not text.strip():
+@app.post("/feedback/")
+async def analyze_text(input_data: TextInput):
+    text = input_data.text.strip()
+    
+    if not text:
         raise HTTPException(status_code=400, detail="Input text cannot be empty.")
     
     corrected_text = correct_spelling(text)
