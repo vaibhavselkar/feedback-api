@@ -11,96 +11,121 @@ import os
 # Initialize FastAPI
 app = FastAPI()
 
-# Download necessary NLTK resources
 nltk.download('punkt')
-nltk.download('wordnet')
+
+app = Flask(__name__)
+CORS(app)
+spell = SpellChecker()
 
 # Ensure the CEFR file exists
-CEFR_FILE = "app/cefr-vocab.csv"
+CEFR_FILE = "api/cefr-vocab.csv"
 if not os.path.exists(CEFR_FILE):
     raise FileNotFoundError(f"Missing CEFR vocabulary file: {CEFR_FILE}")
 
 # Load CEFR word list
 cefr_vocab = pd.read_csv(CEFR_FILE)
+cefr_dict = {k : v for k,v in cefr_vocab[['headword', 'CEFR']].values}
+word_set = set(cefr_vocab.headword)
 
-# Fix column names in case of extra spaces
-cefr_vocab.columns = cefr_vocab.columns.str.strip()
+grammar_fullforms ={'ADV': 'Adverb', 'PREP': 'Prepositions', 'PRON': 'Pronoun', 'WO': 'Wrong Order', 'VERB': 'Verbs', 'VERB:SVA': 'Singular-Plural', 'VERB:TENSE': 'Verb Tenses', 'VERB:FORM': 'Verb Forms', 'VERB:INFL': 'Verbs', 'SPELL': 'Spelling', 'OTHER': 'Other', 'NOUN': 'Other', 'NOUN:NUM': 'Singular-Plural', 'DET': 'Articles', 'MORPH': 'Other', 'ADJ': 'Adjectives', 'PART': 'Other', 'ORTH': 'Other', 'CONJ': 'Conjugations', 'PUNCT': 'Punctuation'}
 
-# Convert CSV to dictionary
-cefr_dict = dict(zip(cefr_vocab["headword"].str.lower(), cefr_vocab["CEFR"]))
+def tabulating_cefr(clean_text):
+    cefr_mapping = cefr_ratings(clean_text)
+    cefr_df = pd.DataFrame(pd.Series(cefr_mapping.values()).value_counts())
+    print(cefr_df)
+    return [word for word in cefr_mapping.keys() if cefr_mapping[word] == 'uncategorized']
 
-# Initialize utilities
-lemmatizer = WordNetLemmatizer()
-spell = SpellChecker()
 
-# Pydantic model for request body
-class TextInput(BaseModel):
-    text: str
+def cefr_ratings(input_words):
+    words = word_tokenize(input_words)
+    lemma_words = [lemmatizer.lemmatize(word.lower()) for word in words]
 
-# Function to analyze CEFR level of words
-def cefr_analysis(text):
-    words = word_tokenize(re.sub(r"[^\w\s]", "", text.lower()))
-    lemmatized_words = [lemmatizer.lemmatize(word) for word in words]
+    pos_values = ['v', 'a', 'n', 'r', 's']
 
-    cefr_result = {word: cefr_dict.get(word, "uncategorized") for word in lemmatized_words}
+    cefr_list = []
+    cefr_mapping = {}
+    for word in lemma_words:
+        if word in word_set:
+            cefr_list.append(cefr_dict[word])
+            cefr_mapping[word] = cefr_dict[word]
+        else:      
+            for pos_value in pos_values:
+                changed_word = lemmatizer.lemmatize(word, pos = pos_value)
+                if changed_word != word:
+                    break
+            if changed_word in word_set:
+                cefr_list.append(cefr_dict[changed_word])
+                cefr_mapping[changed_word] = cefr_dict[changed_word]
+            else:
+                #print(changed_word)
+                cefr_list.append('uncategorized')
+                cefr_mapping[changed_word] = 'uncategorized'
+    return cefr_mapping
+
+@app.route('/')
+def home():
+    return 'Hello, World!'
+
+@app.route('/about')
+def about():
+    return 'About'
+
+@app.route('/run-python', methods=['POST'])
+def run_python():
+
+    data = request.json
+    code = data.get('code', '')
+
+    try:
+        # Execute the Python code
+        result = subprocess.run(
+            ['python3', '-c', code],
+            capture_output=True,
+            text=True,
+            timeout=15  # Limit execution time
+        )
+        output = result.stdout
+        if result.returncode != 0:
+            output = result.stderr
+    except subprocess.TimeoutExpired:
+        output = "Execution timed out."
+
+    return jsonify({'output': output})
+
+@app.route('/feedback', methods=['POST'])
+def feedback():
+    try:
+        data = request.get_json()
+        if not data or 'feedback' not in data or not isinstance(data['feedback'], str):
+            return jsonify({"error": "Invalid input, please provide 'feedback' as a string in JSON format"}), 400
+        
+        feedback = data['feedback']
+        # Remove special characters
+        feedback_cleaned = re.sub('[^A-Za-z0-9 ]+', '', feedback)
+        
+        words = feedback_cleaned.split()
+        misspelled = spell.unknown(words)
+        corrections = {word: spell.correction(word) for word in misspelled}
+
+        table = tabulating_cefr(cefr_ratings(words))
+        
+        return jsonify({
+            "Original Feedback": feedback,
+            "Corrections": corrections,
+            "cefr": table
+        })
     
-    # Count words per CEFR level
-    cefr_count = {}
-    for word, level in cefr_result.items():
-        cefr_count[level] = cefr_count.get(level, 0) + 1
-    
-    return cefr_result, cefr_count
+    except Exception as e:
+        # Log the error and return a 500 response
+        app.logger.error(f"An error occurred: {e}")
+        return jsonify({"error": "An internal error occurred"}), 500
 
-# Function for simple spell correction
-def correct_spelling(text):
-    words = word_tokenize(text.lower())
-    corrected_words = [
-        spell.correction(word) if spell.correction(word) else word
-        for word in words
-    ]
-    return " ".join(corrected_words)
-
-# Function to calculate an overall CEFR level
-def determine_cefr_level(cefr_count):
-    levels = {"A1": 1, "A2": 2, "B1": 3, "B2": 4, "C1": 5, "C2": 6}
-    
-    score = sum(levels.get(level, 0) * count for level, count in cefr_count.items())
-    total_words = sum(cefr_count.values())
-    
-    if total_words == 0:
-        return "Unknown"
-    
-    avg_score = score / total_words
-    
-    if avg_score <= 1.5:
-        return "A1"
-    elif avg_score <= 2.5:
-        return "A2"
-    elif avg_score <= 3.5:
-        return "B1"
-    elif avg_score <= 4.5:
-        return "B2"
-    elif avg_score <= 5.5:
-        return "C1"
-    else:
-        return "C2"
-
-# API Endpoint
-@app.post("/feedback/")
-async def analyze_text(input_data: TextInput):
-    text = input_data.text.strip()
-    
-    if not text:
-        raise HTTPException(status_code=400, detail="Input text cannot be empty.")
-    
-    corrected_text = correct_spelling(text)
-    cefr_result, cefr_count = cefr_analysis(corrected_text)
-    overall_level = determine_cefr_level(cefr_count)
-
-    return {
-        "original_text": text,
-        "corrected_text": corrected_text,
-        "cefr_analysis": cefr_result,
-        "cefr_count": cefr_count,
-        "overall_cefr_level": overall_level
+@app.route('/feedback', methods=['GET'])
+def get_feedback_template():
+    template = {
+        "feedback": "This is an example feedback with some speling errors."
     }
+    return jsonify(template)
+
+if __name__ == '__main__':
+    app.run(debug=True)
