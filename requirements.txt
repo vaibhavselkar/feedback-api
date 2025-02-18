@@ -3,3 +3,4 @@ uvicorn
 nltk
 pandas
 pyspellchecker
+flask
