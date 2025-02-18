@@ -4,3 +4,4 @@ nltk
 pandas
 pyspellchecker
 flask
+flask_cors
