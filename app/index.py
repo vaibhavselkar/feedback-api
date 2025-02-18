@@ -126,6 +126,3 @@ def get_feedback_template():
         "feedback": "This is an example feedback with some speling errors."
     }
     return jsonify(template)
-
-if __name__ == '__main__':
-    app.run(debug=True)
