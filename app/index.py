@@ -15,7 +15,8 @@ nltk.download('wordnet')
 
 # Load CEFR word list
 cefr_vocab = pd.read_csv('./cefr-vocab.csv')
-cefr_dict = dict(zip(cefr_vocab["headword"], cefr_vocab["CEFR"]))
+cefr_dict = {k : v for k,v in cefr_vocab[['headword', 'CEFR']].values}
+word_set = set(cefr_vocab.headword)
 
 # Initialize utilities
 lemmatizer = WordNetLemmatizer()
