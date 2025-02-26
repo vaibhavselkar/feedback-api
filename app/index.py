@@ -11,10 +11,6 @@ import os
 # Initialize FastAPI
 app = FastAPI()
 
-# Download necessary NLTK resources
-nltk.download('punkt')
-nltk.download('wordnet')
-
 # Initialize spell checker and lemmatizer
 spell = SpellChecker()
 lemmatizer = WordNetLemmatizer()
@@ -45,33 +41,35 @@ async def root():
 
 def cefr_ratings(input_text):
     """Process text to extract CEFR levels for each word."""
-    nopunc_input_text = re.sub(r'[^\w\s]', '', input_text.lower())
-    nopunc_input_text = re.sub(r'[0-9]', '', nopunc_input_text)
-    words = word_tokenize(nopunc_input_text)
-    lemma_words = [lemmatizer.lemmatize(word.lower()) for word in words]
+    # ✅ Remove punctuation & numbers
+    clean_text = re.sub(r'[^\w\s]', '', input_text.lower())  # Remove punctuation
+    clean_text = re.sub(r'[0-9]', '', clean_text)  # Remove numbers
 
-    pos_values = ['v', 'a', 'n', 'r', 's']
+    # ✅ Tokenize text (split by spaces instead of NLTK)
+    words = clean_text.split()
+
+    # ✅ Check for spelling corrections
+    misspelled = spell.unknown(words)
+    corrections = {word: spell.correction(word) for word in misspelled}
+
     cefr_mapping = {}
-
-    for word in lemma_words:
+    for word in words:
         if word in word_set:
             cefr_mapping[word] = cefr_dict[word]
         else:
-            for pos_value in pos_values:
-                changed_word = lemmatizer.lemmatize(word, pos=pos_value)
-                if changed_word in word_set:
-                    cefr_mapping[word] = cefr_dict[changed_word]
-                    break
-            else:
-                cefr_mapping[word] = 'uncategorized'
+            cefr_mapping[word] = "uncategorized"
 
-    return cefr_mapping
+    return {"CEFR_Levels": cefr_mapping, "Corrections": corrections}
 
-def tabulate_cefr(clean_text):
-    """Create a CEFR table from the text analysis."""
-    cefr_mapping = cefr_ratings(clean_text)
-    cefr_counts = pd.Series(cefr_mapping.values()).value_counts().to_dict()
-    return cefr_counts
+def tabulating_cefr(input_text):
+    """Tabulate CEFR level counts."""
+    cefr_mapping = cefr_ratings(input_text)["CEFR_Levels"]
+    cefr_counts = dict(Counter(cefr_mapping.values()))  # Count occurrences
+
+    return {
+        "Word Breakdown": cefr_mapping,
+        "CEFR Summary": cefr_counts
+    }
 
 @app.post("/feedback/")
 async def process_feedback(data: FeedbackRequest):
@@ -85,7 +83,7 @@ async def process_feedback(data: FeedbackRequest):
         corrections = {word: spell.correction(word) for word in misspelled}
 
         # Get CEFR table
-        cefr_table = tabulate_cefr(feedback)
+        cefr_table = tabulating_cefr(feedback)
 
         return {
             "Original Feedback": feedback,
