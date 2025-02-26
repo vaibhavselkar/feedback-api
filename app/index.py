@@ -12,7 +12,6 @@ class FeedbackRequest(BaseModel):
 @app.get("/")
 async def root():
     return {"message": "Welcome to the Feedback API"}
-    
 
 @app.post("/feedback/")
 async def process_feedback(data: FeedbackRequest):
