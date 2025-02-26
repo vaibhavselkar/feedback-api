@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from spellchecker import SpellChecker
 import re
+from pydantic import BaseModel
 
 app = FastAPI()
 spell = SpellChecker()  # Initialize the spell checker
