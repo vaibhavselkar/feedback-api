@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from spellchecker import SpellChecker
+from spellchecker import SpellChecker  # ✅ Correct module is `pyspellchecker`
 import re
 
 app = FastAPI()
