@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from spellchecker import SpellChecker
-from indexer import DictionaryIndex
 import subprocess
 import re
 
@@ -14,27 +13,6 @@ class FeedbackRequest(BaseModel):
 @app.get("/")
 async def root():
     return {"message": "Welcome to the Feedback API"}
-
-@app.post("/run-python")
-async def run_python():
-    data = request.json
-    code = data.get('code', '')
-
-    try:
-        # Execute the Python code
-        result = subprocess.run(
-            ['python3', '-c', code],
-            capture_output=True,
-            text=True,
-            timeout=15  # Limit execution time
-        )
-        output = result.stdout
-        if result.returncode != 0:
-            output = result.stderr
-    except subprocess.TimeoutExpired:
-        output = "Execution timed out."
-
-    return {'output': output}
     
 
 @app.post("/feedback/")
