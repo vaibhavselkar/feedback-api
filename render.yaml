@@ -1,12 +1,8 @@
 services:
-  - name: feedback-api
-    type: web
+  - type: web
+    name: feedback-api
     env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app.index:app --host 0.0.0.0 --port 10000"
     plan: free
-    startCommand: uvicorn app.index:asgi_app --host 0.0.0.0 --port 10000
-    envVars:
-      - key: PORT
-        value: 10000
-      - key: PYTHON_VERSION
-        value: 3.9
     autoDeploy: true
