@@ -17,10 +17,15 @@ app = Flask(__name__)
 CORS(app)
 spell = SpellChecker()
 
-# Ensure the CEFR file exists
-CEFR_FILE = "api/cefr-vocab.csv"
+# Correct path construction
+current_dir = os.path.dirname(os.path.abspath(__file__))
+CEFR_FILE = os.path.join(current_dir, 'api', 'cefr-vocab.csv')
+
 if not os.path.exists(CEFR_FILE):
     raise FileNotFoundError(f"Missing CEFR vocabulary file: {CEFR_FILE}")
+
+# Load CEFR word list
+cefr_vocab = pd.read_csv(CEFR_FILE)
 
 # Load CEFR word list
 cefr_vocab = pd.read_csv(CEFR_FILE)
