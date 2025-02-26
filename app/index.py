@@ -6,6 +6,7 @@ from flask_cors import CORS
 import subprocess
 import pandas as pd
 import os
+from asgiref.wsgi import WsgiToAsgi
 
 from nltk.tokenize import word_tokenize, sent_tokenize
 from nltk.stem import WordNetLemmatizer
@@ -14,6 +15,7 @@ lemmatizer = WordNetLemmatizer()
 
 
 app = Flask(__name__)
+asgi_app = WsgiToAsgi(app)
 CORS(app)
 spell = SpellChecker()
 
