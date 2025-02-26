@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from spellchecker import SpellChecker
+from indexer import DictionaryIndex
 import subprocess
 import re
 
