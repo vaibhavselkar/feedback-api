@@ -19,13 +19,20 @@ spell = SpellChecker()
 lemmatizer = WordNetLemmatizer()
 
 # Load CEFR Vocabulary
-CEFR_FILE = "./cefr-vocab.csv"
-try:
-    cefr_vocab = pd.read_csv(CEFR_FILE)
-    cefr_dict = {k: v for k, v in cefr_vocab[['headword', 'CEFR']].values}
-    word_set = set(cefr_vocab.headword)
-except Exception as e:
-    raise RuntimeError(f"Error loading CEFR vocabulary file: {e}")
+# Correct path construction
+current_dir = os.path.dirname(os.path.abspath(__file__))
+CEFR_FILE = os.path.join(current_dir, 'api', 'cefr-vocab.csv')
+
+if not os.path.exists(CEFR_FILE):
+    raise FileNotFoundError(f"Missing CEFR vocabulary file: {CEFR_FILE}")
+
+# Load CEFR word list
+cefr_vocab = pd.read_csv(CEFR_FILE)
+
+# Load CEFR word list
+cefr_vocab = pd.read_csv(CEFR_FILE)
+cefr_dict = {k : v for k,v in cefr_vocab[['headword', 'CEFR']].values}
+word_set = set(cefr_vocab.headword)
 
 # Define request model
 class FeedbackRequest(BaseModel):
