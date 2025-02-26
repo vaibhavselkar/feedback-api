@@ -3,5 +3,6 @@ uvicorn
 nltk
 pandas
 pyspellchecker
-flask
+flask[async]
 flask_cors
+asgiref
