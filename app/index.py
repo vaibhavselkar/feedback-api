@@ -6,6 +6,7 @@ import re
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
+import os
 
 # Initialize FastAPI
 app = FastAPI()
