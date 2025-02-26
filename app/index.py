@@ -35,5 +35,4 @@ def process_feedback(data: FeedbackRequest):
     
     except Exception as e:
         # Log the error and return a 500 response
-        app.logger.error(f"An error occurred: {e}")
         return jsonify({"error": "An internal error occurred"}), 500
