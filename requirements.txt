@@ -4,3 +4,4 @@ nltk
 pydantic
 pandas
 pyspellchecker
+os
