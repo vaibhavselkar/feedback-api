@@ -4,3 +4,8 @@ nltk
 pydantic
 pandas
 pyspellchecker
+git+https://github.com/PrithivirajDamodaran/Gramformer.git
+torch
+transformers
+sentencepiece
+protobuf==3.20.*
