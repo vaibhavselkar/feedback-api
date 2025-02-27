@@ -1,11 +1,6 @@
 fastapi
 uvicorn
-nltk
 pydantic
-pandas
 pyspellchecker
-git+https://github.com/PrithivirajDamodaran/Gramformer.git
-torch
-transformers
-sentencepiece
-protobuf==3.20.*
+spacy
+gingerit
