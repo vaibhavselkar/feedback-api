@@ -73,11 +73,13 @@ def cefr_ratings(input_text):
 
 def tabulating_cefr(input_text):
     """Tabulate CEFR level counts."""
-    cefr_mapping = cefr_ratings(input_text)["CEFR_Levels"]
+    input = cefr_ratings(input_text)
+    cefr_mapping = input["CEFR_Levels"]
+    corrections = input["Corrections"]
     cefr_counts = dict(Counter(cefr_mapping.values()))  # Count occurrences
 
     return {
-        "Word Breakdown": cefr_mapping,
+        "Corrections": corrections,
         "CEFR Summary": cefr_counts
     }
 
@@ -87,17 +89,16 @@ async def process_feedback(data: FeedbackRequest):
         feedback = data.feedback
 
         # Remove special characters for spell check
-        feedback_cleaned = re.sub(r'[^A-Za-z0-9 ]+', '', feedback)
-        words = feedback_cleaned.split()
-        misspelled = spell.unknown(words)
-        corrections = {word: spell.correction(word) for word in misspelled}
+        #feedback_cleaned = re.sub(r'[^A-Za-z0-9 ]+', '', feedback)
+        #words = feedback_cleaned.split()
+        #misspelled = spell.unknown(words)
+        #corrections = {word: spell.correction(word) for word in misspelled}
 
         # Get CEFR table
         cefr_table = tabulating_cefr(feedback)
 
         return {
-            "Original Feedback": feedback,
-            "Corrections": corrections,
+            "Corrections": cefr_table["Corrections"],
             "CEFR Table": cefr_table
         }
     
