@@ -9,6 +9,7 @@ from nltk.stem import WordNetLemmatizer
 from collections import Counter
 import os
 from fastapi.middleware.cors import CORSMiddleware
+from gramformer import Gramformer
 
 # Initialize FastAPI
 app = FastAPI()
@@ -24,6 +25,7 @@ app.add_middleware(
 # Initialize spell checker and lemmatizer
 spell = SpellChecker()
 lemmatizer = WordNetLemmatizer()
+gf = Gramformer(models=1, use_gpu=False)
 
 # Load CEFR Vocabulary
 # Correct path construction
@@ -83,6 +85,36 @@ def tabulating_cefr(input_text):
         "CEFR Summary": cefr_counts
     }
 
+def text_grammar_correction_highlight(input_text):
+    """Corrects grammar mistakes and highlights changes in HTML."""
+    sentences = input_text.split(". ")  # Simple sentence splitting
+    color_corrected_text = ''
+
+    for sentence in sentences:
+        corrected_sentences = gf.correct(sentence, max_candidates=1)
+
+        for corrected_sentence in corrected_sentences:
+            all_edits = gf.get_edits(sentence, corrected_sentence)
+            orig = sentence.split()
+            amend_plus = []
+            start = 0
+
+            for edit in all_edits:
+                amend_plus.extend(orig[start:edit[2]])
+
+                if edit[1]:  # Incorrect word
+                    amend_plus.append(f'<span style="background-color:#ffcccc;color:#ff3f33;text-decoration:line-through;">{edit[1]}</span>')
+
+                if edit[4]:  # Corrected word
+                    amend_plus.append(f'<span style="color:#07b81a;font-weight:bold;">{edit[4]}</span>')
+
+                start = edit[3]  # Move start index
+
+            amend_plus.extend(orig[start:])
+            color_corrected_text += ' ' + ' '.join(amend_plus) + '.'
+
+    return color_corrected_text.strip()
+
 @app.post("/feedback/")
 async def process_feedback(data: FeedbackRequest):
     try:
@@ -97,8 +129,11 @@ async def process_feedback(data: FeedbackRequest):
         # Get CEFR table
         cefr_table = tabulating_cefr(feedback)
 
+        highlighted_text = text_grammar_correction_highlight(feedback)
+
         return {
             "Corrections": cefr_table["Corrections"],
+            "Grammar Highlighted Text": highlighted_text,
             "CEFR Table": cefr_table
         }
     
