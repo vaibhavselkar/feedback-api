@@ -1,49 +1,43 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from spellchecker import SpellChecker
-import pandas as pd
+from gingerit.gingerit import GingerIt
+import spacy
+import csv
 import re
-import nltk
-from nltk.tokenize import word_tokenize
-from nltk.stem import WordNetLemmatizer
 from collections import Counter
-import os
 from fastapi.middleware.cors import CORSMiddleware
-from gramformer import Gramformer
 
 # Initialize FastAPI
 app = FastAPI()
 
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ✅ Allow all origins (change this in production)
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
-# Initialize spell checker and lemmatizer
+# Load spaCy NLP Model
+nlp = spacy.load("en_core_web_sm")
+
+# Load Spell Checker
 spell = SpellChecker()
-lemmatizer = WordNetLemmatizer()
-gf = Gramformer(models=1, use_gpu=False)
 
-# Load CEFR Vocabulary
-# Correct path construction
-current_dir = os.path.dirname(os.path.abspath(__file__))
-CEFR_FILE = os.path.join(current_dir, 'api', 'cefr-vocab.csv')
+# Load CEFR Vocabulary from CSV (Replaces Pandas)
+cefr_dict = {}
+try:
+    with open("cefr-vocab.csv", newline='', encoding="utf-8") as csvfile:
+        reader = csv.reader(csvfile)
+        next(reader)  # Skip header
+        for row in reader:
+            cefr_dict[row[0].lower()] = row[1]  # Store word & CEFR level
+except FileNotFoundError:
+    raise FileNotFoundError("Missing CEFR vocabulary file: cefr-vocab.csv")
 
-if not os.path.exists(CEFR_FILE):
-    raise FileNotFoundError(f"Missing CEFR vocabulary file: {CEFR_FILE}")
-
-# Load CEFR word list
-cefr_vocab = pd.read_csv(CEFR_FILE)
-
-# Load CEFR word list
-cefr_vocab = pd.read_csv(CEFR_FILE)
-cefr_dict = {k : v for k,v in cefr_vocab[['headword', 'CEFR']].values}
-word_set = set(cefr_vocab.headword)
-
-# Define request model
+# Request Model
 class FeedbackRequest(BaseModel):
     feedback: str
 
@@ -51,67 +45,58 @@ class FeedbackRequest(BaseModel):
 async def root():
     return {"message": "Welcome to the Feedback API"}
 
-def cefr_ratings(input_text):
-    """Process text to extract CEFR levels for each word."""
-    # ✅ Remove punctuation & numbers
-    clean_text = re.sub(r'[^\w\s]', '', input_text.lower())  # Remove punctuation
-    clean_text = re.sub(r'[0-9]', '', clean_text)  # Remove numbers
+# ✅ Function to Tokenize & Lemmatize text
+def tokenize_and_lemmatize(text):
+    doc = nlp(text)
+    return [token.lemma_.lower() for token in doc if token.is_alpha]  # Remove punctuations
 
-    # ✅ Tokenize text (split by spaces instead of NLTK)
-    words = clean_text.split()
-
-    # ✅ Check for spelling corrections
-    misspelled = spell.unknown(words)
-    corrections = {word: spell.correction(word) for word in misspelled}
-
+# ✅ Function to Analyze CEFR Levels
+def analyze_cefr_levels(text):
+    words = tokenize_and_lemmatize(text)
     cefr_mapping = {}
+    
     for word in words:
-        if word in word_set:
-            cefr_mapping[word] = cefr_dict[word]
-        else:
-            cefr_mapping[word] = "uncategorized"
+        cefr_mapping[word] = cefr_dict.get(word, "uncategorized")  # Get CEFR level
 
-    return {"CEFR_Levels": cefr_mapping, "Corrections": corrections}
-
-def tabulating_cefr(input_text):
-    """Tabulate CEFR level counts."""
-    input = cefr_ratings(input_text)
-    cefr_mapping = input["CEFR_Levels"]
-    corrections = input["Corrections"]
     cefr_counts = dict(Counter(cefr_mapping.values()))  # Count occurrences
 
-    return {
-        "Corrections": corrections,
-        "CEFR Summary": cefr_counts
-    }
+    return {"Word Breakdown": cefr_mapping, "CEFR Summary": cefr_counts}
 
+# ✅ Function to Check Spelling
+def check_spelling(text):
+    words = tokenize_and_lemmatize(text)
+    misspelled = spell.unknown(words)
+    return {word: spell.correction(word) for word in misspelled}
+
+# ✅ Function to Correct Grammar and Highlight Mistakes
 def text_grammar_correction_highlight(input_text):
-    """Corrects grammar mistakes and highlights changes in HTML."""
-    sentences = input_text.split(". ")  # Simple sentence splitting
+    sentences = input_text.split(". ")  # Basic sentence splitting using periods
     color_corrected_text = ''
+    ginger = GingerIt()
 
     for sentence in sentences:
-        corrected_sentences = gf.correct(sentence, max_candidates=1)
+        correction = ginger.parse(sentence)  # Get corrected text
+        corrected_sentence = correction["result"]
 
-        for corrected_sentence in corrected_sentences:
-            all_edits = gf.get_edits(sentence, corrected_sentence)
-            orig = sentence.split()
-            amend_plus = []
-            start = 0
+        all_edits = correction["corrections"] if "corrections" in correction else []
+        orig = sentence.split()  # Tokenize using simple split
+        amend_plus = []
+        start = 0
 
-            for edit in all_edits:
-                amend_plus.extend(orig[start:edit[2]])
+        for edit in all_edits:
+            incorrect_word = edit["text"]
+            corrected_word = edit["correct"]
 
-                if edit[1]:  # Incorrect word
-                    amend_plus.append(f'<span style="background-color:#ffcccc;color:#ff3f33;text-decoration:line-through;">{edit[1]}</span>')
+            # Highlight incorrect words in RED
+            amend_plus.append(f'<span style="background-color:#ffffff;color:#ff3f33">{incorrect_word}</span>')
 
-                if edit[4]:  # Corrected word
-                    amend_plus.append(f'<span style="color:#07b81a;font-weight:bold;">{edit[4]}</span>')
+            # Highlight corrected words in GREEN
+            amend_plus.append(f'<span style="color:#07b81a">{corrected_word}</span>')
 
-                start = edit[3]  # Move start index
+            start += 1  # Move start index
 
-            amend_plus.extend(orig[start:])
-            color_corrected_text += ' ' + ' '.join(amend_plus) + '.'
+        amend_plus.extend(orig[start:])  # Add remaining words
+        color_corrected_text += ' ' + ' '.join(amend_plus) + '.'  # Append period back
 
     return color_corrected_text.strip()
 
@@ -120,25 +105,22 @@ async def process_feedback(data: FeedbackRequest):
     try:
         feedback = data.feedback
 
-        # Remove special characters for spell check
-        #feedback_cleaned = re.sub(r'[^A-Za-z0-9 ]+', '', feedback)
-        #words = feedback_cleaned.split()
-        #misspelled = spell.unknown(words)
-        #corrections = {word: spell.correction(word) for word in misspelled}
+        # Perform Spell Check
+        corrections = check_spelling(feedback)
 
-        # Get CEFR table
-        cefr_table = tabulating_cefr(feedback)
+        # Analyze CEFR Levels
+        cefr_table = analyze_cefr_levels(feedback)
 
+        # Correct Grammar with Highlights
         highlighted_text = text_grammar_correction_highlight(feedback)
 
         return {
-            "Corrections": cefr_table["Corrections"],
-            "Grammar Highlighted Text": highlighted_text,
-            "CEFR Table": cefr_table
+            "Original Feedback": feedback,
+            "Corrections": corrections,
+            "CEFR Table": cefr_table,
+            "Grammar Highlighted": highlighted_text
         }
-    
+
     except Exception as e:
-        raise HTTPException(
-            status_code=500, 
-            detail=f"An internal error occurred: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"An internal error occurred: {str(e)}")
+
